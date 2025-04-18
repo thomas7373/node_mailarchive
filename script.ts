@@ -1,0 +1,179 @@
+// archive-imap-script.ts
+
+function flattenBoxes(boxes: Imap.MailBoxes, prefix = ''): string[] {
+  const result: string[] = [];
+
+  for (const [name, box] of Object.entries(boxes)) {
+    const fullName = prefix ? `${prefix}.${name}` : name;
+    if (
+      !fullName.includes('Archive.') &&
+      !fullName.match(/INBOX\.(Sent|Sent Items|Kimenő|Elküldött elemek|Trash)/)
+    ) {
+      result.push(fullName);
+    }
+
+    if (box.children) {
+      result.push(...flattenBoxes(box.children, fullName));
+    }
+  }
+
+  return result;
+}
+import Imap from 'imap';
+import fs from 'fs';
+import readline from 'readline';
+import { config } from './config';
+
+function openBox(imap: Imap, boxName: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    imap.openBox(boxName, false, (err: Error | null) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
+
+function getAllUserMailboxes(imap: Imap): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    imap.getBoxes('INBOX', (err, boxes) => {
+      if (err || !boxes) return reject(err);
+      const allFolders = flattenBoxes(boxes);
+      resolve(allFolders);
+    });
+  });
+}
+
+function createBox(imap: Imap, boxName: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    imap.addBox(boxName, (err: Error | null) => {
+      if (err && !/already exists/i.test(err.message)) {
+        reject(err);
+      } else {
+        resolve();
+      }
+    });
+  });
+}
+
+function searchMessages(imap: Imap): Promise<number[]> {
+  return new Promise((resolve, reject) => {
+    imap.search([['SINCE', '1-Jan-2023'], ['BEFORE', '1-Jan-2024']], (err: Error | null, results: number[] = []) => {
+      if (err) reject(err);
+      else resolve(results);
+    });
+  });
+}
+
+function processUser(username: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const imap = new Imap({
+      user: `${username}*${config.MASTER_USER}`,
+      password: config.MASTER_PASS,
+      host: config.IMAP_HOST,
+      port: config.IMAP_PORT,
+      tls: true,
+    });
+
+    imap.once('ready', async () => {
+      try {
+        await createBox(imap, 'INBOX.Archive.Bejövő');
+        await createBox(imap, 'INBOX.Archive.Kimenő');
+        imap.subscribeBox('INBOX.Archive.Bejövő', (err) => {
+          if (err) console.warn(`⚠️  Nem sikerült feliratkozni: INBOX.Archive.Bejövő - ${err.message}`);
+        });
+        imap.subscribeBox('INBOX.Archive.Kimenő', (err) => {
+          if (err) console.warn(`⚠️  Nem sikerült feliratkozni: INBOX.Archive.Kimenő - ${err.message}`);
+        });
+
+        await openBox(imap, 'INBOX');
+        const messages = await searchMessages(imap);
+        console.log(`📦 ${username}: ${messages.length} db 2023-as levél található az INBOX-ban.`);
+        if (messages.length > 0) {
+          imap.move(messages, 'INBOX.Archive.Bejövő', (err) => {
+            if (err) console.error(`❌ Nem sikerült áthelyezni az INBOX-ból: ${err.message}`);
+            else console.log(`🗂️  INBOX archiválva: ${messages.length} levél`);
+          });
+        }
+        const sentFolders = [
+          'INBOX.Sent',
+          'INBOX.Sent Items',
+          'INBOX.Kimenő',
+        ];
+        let sentMoved = false;
+
+        for (const folder of sentFolders) {
+          try {
+            await openBox(imap, folder);
+            const sentMessages = await searchMessages(imap);
+            if (sentMessages.length > 0) {
+              imap.move(sentMessages, 'INBOX.Archive.Kimenő', (err) => {
+                if (err) console.error(`❌ Nem sikerült áthelyezni a(z) ${folder} mappából: ${err.message}`);
+                else console.log(`🗂️  ${folder} archiválva: ${sentMessages.length} levél`);
+              });
+              sentMoved = true;
+              break;
+            }
+          } catch (err) {
+            // console.warn(`⚠️  Nem sikerült megnyitni: ${folder} (${(err as Error).message})`);
+            continue;
+          }
+        }
+
+        if (!sentMoved) {
+          console.log(`ℹ️  Nem találtunk archiválható levelet kimenő mappákban (${username})`);
+        }
+        const otherFolders = await getAllUserMailboxes(imap);
+        for (const folder of otherFolders) {
+          try {
+            await openBox(imap, folder);
+            const messages = await searchMessages(imap);
+            if (messages.length > 0) {
+              const archiveName = folder.replace('INBOX.', 'INBOX.Archive.');
+              await createBox(imap, archiveName);
+              imap.move(messages, archiveName, (err) => {
+                if (err) console.error(`❌ Nem sikerült áthelyezni a(z) ${folder} mappából: ${err.message}`);
+                else console.log(`🗂️  ${folder} archiválva: ${messages.length} levél`);
+              });
+            }
+          } catch (err) {
+            // console.warn(`⚠️  Nem sikerült feldolgozni: ${folder} (${(err as Error).message})`);
+          }
+        }
+      } catch (err: unknown) {
+        console.error(`⚠️  Hiba ${username} feldolgozásakor:`, err);
+      } finally {
+        imap.end();
+        resolve();
+      }
+    });
+
+    imap.once('error', (err: Error) => {
+      console.error(`❌ Hiba ${username} fióknál:`, err);
+      reject(err);
+    });
+
+    imap.connect();
+  });
+}
+
+async function processAllUsers() {
+  const rl = readline.createInterface({
+    input: fs.createReadStream(config.USER_LIST_FILE),
+    crlfDelay: Infinity,
+  });
+
+  for await (const line of rl) {
+    const username = line.trim();
+    if (username) {
+      try {
+        await processUser(username);
+      } catch (e: unknown) {
+        // már kiírtuk a hibát a processUser-ben
+      }
+    }
+  }
+}
+
+processAllUsers().then(() => {
+  console.log('📋 Feldolgozás kész');
+});

@@ -1,0 +1,14 @@
+// config.ts
+export const config = {
+    IMAP_HOST: 'mail.example.hu',
+    MASTER_USER: 'admin',
+    MASTER_PASS: 'XXXXXXXXXXXXXX',
+    IMAP_PORT: 993,
+    USER_LIST_FILE: 'user_list.txt',
+
+    SMTP_HOST: 'mail.example.hu',
+    SMTP_PORT: 587,
+    SMTP_SECURE: false, // ha nem TLS-t használsz
+    SMTP_USER: 'user@domain',
+    SMTP_PASS: 'XXXXXXXXXXXXXX',
+}
