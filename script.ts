@@ -1,4 +1,9 @@
 // archive-imap-script.ts
+import Imap from 'imap';
+import fs from 'fs';
+import readline from 'readline';
+import { config } from './config';
+
 
 function flattenBoxes(boxes: Imap.MailBoxes, prefix = ''): string[] {
   const result: string[] = [];
@@ -19,10 +24,6 @@ function flattenBoxes(boxes: Imap.MailBoxes, prefix = ''): string[] {
 
   return result;
 }
-import Imap from 'imap';
-import fs from 'fs';
-import readline from 'readline';
-import { config } from './config';
 
 function sendCompletionNotice(imap: Imap, user: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -181,19 +182,51 @@ async function processAllUsers() {
     input: fs.createReadStream(config.USER_LIST_FILE),
     crlfDelay: Infinity,
   });
-
+ 
+  const users: string[] = [];
   for await (const line of rl) {
     const username = line.trim();
     if (username) {
+      users.push(username);
+    }
+  }
+ 
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+  const BATCH_SIZE = config.BATCH_SIZE;
+  const DELAY_MS = config.DELAY_MS;
+  const WORK_HOUR_START = config.WORK_HOUR_START;
+  const WORK_HOUR_END = config.WORK_HOUR_END;
+ 
+  for (let i = 0; i < users.length; i += BATCH_SIZE) {
+    const now = new Date();
+    const hour = now.getHours();
+ 
+    if (hour < WORK_HOUR_START || hour >= WORK_HOUR_END) {
+      const msUntil9am =
+        ((24 + WORK_HOUR_START - hour) % 24) * 60 * 60 * 1000 -
+        now.getMinutes() * 60 * 1000 -
+        now.getSeconds() * 1000 -
+        now.getMilliseconds();
+      console.log(`⏳ Munkaidőn kívül vagyunk, várunk ${Math.ceil(msUntil9am / 60000)} percet a folytatásig...`);
+      await delay(msUntil9am);
+    }
+ 
+    const batch = users.slice(i, i + BATCH_SIZE);
+    console.log(`🚀 Feldolgozás indul (${i + 1}–${i + batch.length})`);
+ 
+    for (const user of batch) {
       try {
-        await processUser(username);
+        await processUser(user);
       } catch (e: unknown) {
         // már kiírtuk a hibát a processUser-ben
       }
     }
+ 
+    if (i + BATCH_SIZE < users.length) {
+      console.log(`⏸️ Várakozás 2 órát a következő batch előtt...`);
+      await delay(DELAY_MS);
+    }
   }
-}
-
-processAllUsers().then(() => {
+ 
   console.log('📋 Feldolgozás kész');
-});
+}

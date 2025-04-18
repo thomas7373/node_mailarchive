@@ -11,4 +11,9 @@ export const config = {
     SMTP_SECURE: false, // ha nem TLS-t használsz
     SMTP_USER: 'user@domain',
     SMTP_PASS: 'XXXXXXXXXXXXXX',
+
+    BATCH_SIZE: 50,
+    DELAY_MS: 2 * 60 * 60 * 1000, // 2 óra
+    WORK_HOUR_START: 9,
+    WORK_HOUR_END: 17,
 }
