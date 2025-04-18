@@ -24,6 +24,25 @@ import fs from 'fs';
 import readline from 'readline';
 import { config } from './config';
 
+function sendCompletionNotice(imap: Imap, user: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const now = new Date();
+    const message = [
+      `From: rendszeradmin@${user.split('@')[1]}`,
+      `To: ${user}`,
+      `Subject: Értesítés: Levelek archiválása megtörtént`,
+      `Date: ${now.toUTCString()}`,
+      '',
+      `Tisztelt ${user}!\n\nA 2023-as leveleit archiváltuk az alábbi mappákba:\n- Archive.Bejövő\n- Archive.Kimenő\n\nAz archiválás sikeresen megtörtént.\n\nÜdvözlettel:\nRendszeradminisztráció`
+    ].join('\r\n');
+
+    imap.append(message, { mailbox: 'INBOX', date: now }, (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
+
 function openBox(imap: Imap, boxName: string): Promise<void> {
   return new Promise((resolve, reject) => {
     imap.openBox(boxName, false, (err: Error | null) => {
@@ -142,6 +161,7 @@ function processUser(username: string): Promise<void> {
       } catch (err: unknown) {
         console.error(`⚠️  Hiba ${username} feldolgozásakor:`, err);
       } finally {
+        await sendCompletionNotice(imap, username);
         imap.end();
         resolve();
       }
