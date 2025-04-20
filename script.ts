@@ -230,3 +230,6 @@ async function processAllUsers() {
  
   console.log('📋 Feldolgozás kész');
 }
+
+
+processAllUsers();
