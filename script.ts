@@ -123,10 +123,21 @@ function processUser(username: string): Promise<void> {
         const messages = await searchMessages(imap);
         console.log(`📦 ${username}: ${messages.length} db 2023-as levél található az INBOX-ban.`);
         if (messages.length > 0) {
-          imap.move(messages, 'INBOX.Archive.Bejövő', (err) => {
-            if (err) console.error(`❌ Nem sikerült áthelyezni az INBOX-ból: ${err.message}`);
-            else console.log(`🗂️  INBOX archiválva: ${messages.length} levél`);
-          });
+          const BATCH_SIZE = 100;
+          for (let i = 0; i < messages.length; i += BATCH_SIZE) {
+            const chunk = messages.slice(i, i + BATCH_SIZE);
+            await new Promise<void>((resolve, reject) => {
+              imap.move(chunk, 'INBOX.Archive.Bejövő', (err) => {
+                if (err) {
+                  console.error(`❌ Nem sikerült áthelyezni az INBOX-ból (${chunk.length} levél): ${err.message}`);
+                  reject(err);
+                } else {
+                  console.log(`🗂️  INBOX-ból áthelyezve: ${chunk.length} levél`);
+                  resolve();
+                }
+              });
+            });
+          }
         }
         const sentFolders = [
           'INBOX.Sent',
@@ -140,10 +151,21 @@ function processUser(username: string): Promise<void> {
             await openBox(imap, folder);
             const sentMessages = await searchMessages(imap);
             if (sentMessages.length > 0) {
-              imap.move(sentMessages, 'INBOX.Archive.Kimenő', (err) => {
-                if (err) console.error(`❌ Nem sikerült áthelyezni a(z) ${folder} mappából: ${err.message}`);
-                else console.log(`🗂️  ${folder} archiválva: ${sentMessages.length} levél`);
-              });
+              const BATCH_SIZE = 100;
+              for (let i = 0; i < sentMessages.length; i += BATCH_SIZE) {
+                const chunk = sentMessages.slice(i, i + BATCH_SIZE);
+                await new Promise<void>((resolve, reject) => {
+                  imap.move(chunk, 'INBOX.Archive.Kimenő', (err) => {
+                    if (err) {
+                      console.error(`❌ Nem sikerült áthelyezni a(z) ${folder} mappából (${chunk.length} levél): ${err.message}`);
+                      reject(err);
+                    } else {
+                      console.log(`🗂️  ${folder}-ból áthelyezve: ${chunk.length} levél`);
+                      resolve();
+                    }
+                  });
+                });
+              }
               sentMoved = true;
               break;
             }
@@ -164,10 +186,21 @@ function processUser(username: string): Promise<void> {
             if (messages.length > 0) {
               const archiveName = folder.replace('INBOX.', 'INBOX.Archive.');
               await createBox(imap, archiveName);
-              imap.move(messages, archiveName, (err) => {
-                if (err) console.error(`❌ Nem sikerült áthelyezni a(z) ${folder} mappából: ${err.message}`);
-                else console.log(`🗂️  ${folder} archiválva: ${messages.length} levél`);
-              });
+              const BATCH_SIZE = 100;
+              for (let i = 0; i < messages.length; i += BATCH_SIZE) {
+                const chunk = messages.slice(i, i + BATCH_SIZE);
+                await new Promise<void>((resolve, reject) => {
+                  imap.move(chunk, archiveName, (err) => {
+                    if (err) {
+                      console.error(`❌ Nem sikerült áthelyezni a(z) ${folder} mappából (${chunk.length} levél): ${err.message}`);
+                      reject(err);
+                    } else {
+                      console.log(`🗂️  ${folder}-ból áthelyezve: ${chunk.length} levél`);
+                      resolve();
+                    }
+                  });
+                });
+              }
             }
           } catch (err) {
             // console.warn(`⚠️  Nem sikerült feldolgozni: ${folder} (${(err as Error).message})`);
