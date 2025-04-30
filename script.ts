@@ -132,7 +132,7 @@ function processUser(username: string): Promise<void> {
                   console.error(`❌ Nem sikerült áthelyezni az INBOX-ból (${chunk.length} levél): ${err.message}`);
                   reject(err);
                 } else {
-                  console.log(`🗂️  INBOX-ból áthelyezve: ${chunk.length} levél`);
+                  console.log(`🗂️ ${username} INBOX-ból áthelyezve: ${chunk.length} levél`);
                   resolve();
                 }
               });
