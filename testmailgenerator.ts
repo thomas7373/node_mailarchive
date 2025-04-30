@@ -55,10 +55,12 @@ async function sendMailsToAllUsers(year: number) {
   for await (const line of rl) {
     const user = line.trim();
     if (user) {
-      try {
-        await sendTestMail(user, year);
-      } catch (err) {
-        console.error(`⚠️  Hiba ${user} levélküldésekor:`, err);
+      for (let i = 0; i < 250; i++) {
+        try {
+          await sendTestMail(user, year);
+        } catch (err) {
+          console.error(`⚠️  Hiba ${user} levélküldésekor (${i + 1}/250):`, err);
+        }
       }
     }
   }
@@ -81,5 +83,3 @@ sendMailsToAllUsers(2022).then(() => {
 sendMailsToAllUsers(2023).then(() => {
   console.log('✅ Minden tesztlevél elküldve');
 });
-
-
