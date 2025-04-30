@@ -74,6 +74,12 @@ function getRandomDateString(year: number): string {
     return date.toUTCString();
 }
 
+sendMailsToAllUsers(2022).then(() => {
+  console.log('✅ Minden tesztlevél elküldve');
+});
+
 sendMailsToAllUsers(2023).then(() => {
   console.log('✅ Minden tesztlevél elküldve');
 });
+
+
