@@ -2,6 +2,7 @@
 import Imap from 'imap';
 import fs from 'fs';
 import readline from 'readline';
+import { execSync } from 'child_process';
 import { config } from './config';
 
 
@@ -28,13 +29,20 @@ function flattenBoxes(boxes: Imap.MailBoxes, prefix = ''): string[] {
 function sendCompletionNotice(imap: Imap, user: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const now = new Date();
+    const formattedDate = now.toISOString().replace('T', ' ').substring(0, 16).replace(/-/g, '.');
     const message = [
-      `From: rendszeradmin@${user.split('@')[1]}`,
+      `From: informatika@prizma.hu`,
       `To: ${user}`,
       `Subject: Értesítés: Levelek archiválása megtörtént`,
       `Date: ${now.toUTCString()}`,
       '',
-      `Tisztelt ${user}!\n\nA 2023-as leveleit archiváltuk az alábbi mappákba:\n- Archive.Bejövő\n- Archive.Kimenő\n\nAz archiválás sikeresen megtörtént.\n\nÜdvözlettel:\nRendszeradminisztráció`
+      `Tisztelt ${user}!\n`,
+      `A 2021.01.01-2022.12.31 leveleit archiváltuk.`,
+      `A "Bejövő levelek" mappában lévő 2023.01.01-2023.12.31 között érkezett leveleit áthelyeztük az: "Archive/Bejövő" mappába.`,
+      `A "Kimenő levelek" mappában lévő 2023.01.01-2023.12.31 között küldött leveleit áthelyeztük az: "Archive/Kimenő" mappába.\n`,
+      `A változások megjelenéséhez kérjük indítsa újra a levelező programját (Outlook)\n`,
+      `Az archiválás sikeresen megtörtént: ${formattedDate}\n`,
+      `Üdvözlettel:\nPrizma IT`
     ].join('\r\n');
 
     imap.append(message, { mailbox: 'INBOX', date: now }, (err) => {
@@ -162,6 +170,14 @@ function processUser(username: string): Promise<void> {
       } catch (err: unknown) {
         console.error(`⚠️  Hiba ${username} feldolgozásakor:`, err);
       } finally {
+
+        try {
+          execSync(`doveadm expunge -u ${username} mailbox '*' before 2023-01-01`);
+          console.log(`🧹 doveadm: Régi levelek törölve fájlrendszerből (${username})`);
+        } catch (expungeError) {
+          console.error(`❌ doveadm hiba (${username}): ${(expungeError as Error).message}`);
+        }
+
         await sendCompletionNotice(imap, username);
         imap.end();
         resolve();

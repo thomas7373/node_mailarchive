@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@types/imap": "^0.8.42",
+    "child_process": "^1.0.2",
     "imap": "^0.8.19",
     "nodemailer": "^6.10.1"
   }
