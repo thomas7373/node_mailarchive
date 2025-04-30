@@ -29,7 +29,13 @@ function flattenBoxes(boxes: Imap.MailBoxes, prefix = ''): string[] {
 function sendCompletionNotice(imap: Imap, user: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const now = new Date();
-    const formattedDate = now.toISOString().replace('T', ' ').substring(0, 16).replace(/-/g, '.');
+    const formattedDate = now.toLocaleString('hu-HU', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).replace(',', '');
     const message = [
       `From: informatika@prizma.hu`,
       `To: ${user}`,
