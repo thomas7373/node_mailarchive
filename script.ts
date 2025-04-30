@@ -178,7 +178,7 @@ function processUser(username: string): Promise<void> {
       } finally {
 
         try {
-          execSync(`doveadm expunge -u ${username} mailbox '*' before 2023-01-01`);
+          execSync(`doveadm expunge -u ${username} mailbox before 2023-01-01`);
           console.log(`🧹 doveadm: Régi levelek törölve fájlrendszerből (${username})`);
         } catch (expungeError) {
           console.error(`❌ doveadm hiba (${username}): ${(expungeError as Error).message}`);
