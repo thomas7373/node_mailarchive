@@ -178,10 +178,11 @@ function processUser(username: string): Promise<void> {
       } finally {
 
         try {
-          execSync(`doveadm expunge -u ${username} mailbox before 2023-01-01`);
-          console.log(`🧹 doveadm: Régi levelek törölve fájlrendszerből (${username})`);
+          const maildir = `/var/spool/postfix/virtual/prizma.hu/${username}`;
+          execSync(`find ${maildir}/cur ${maildir}/new -type f -not -newermt 2023-01-01 -delete`);
+          console.log(`🧹 Fájlrendszer: Régi levelek törölve (${maildir})`);
         } catch (expungeError) {
-          console.error(`❌ doveadm hiba (${username}): ${(expungeError as Error).message}`);
+          console.error(`❌ Fájlrendszer törlés hiba (${username}): ${(expungeError as Error).message}`);
         }
 
         await sendCompletionNotice(imap, username);
