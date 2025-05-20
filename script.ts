@@ -39,8 +39,11 @@ function sendCompletionNotice(imap: Imap, user: string): Promise<void> {
     const message = [
       `From: informatika@prizma.hu`,
       `To: ${user}`,
-      `Subject: Értesítés: Levelek archiválása megtörtént`,
+      `Subject: =?UTF-8?B?` + Buffer.from('Értesítés: Levelek archiválása megtörtént').toString('base64') + `?=`,
       `Date: ${now.toUTCString()}`,
+      `MIME-Version: 1.0`,
+      `Content-Type: text/plain; charset="UTF-8"`,
+      `Content-Transfer-Encoding: 8bit`,
       '',
       `Tisztelt ${user}!\n`,
       `A 2021.01.01-2022.12.31 leveleit archiváltuk.`,
